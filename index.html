@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Secure File Sharder & Joiner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-700 to-sky-500 font-sans p-4">
+
+  <!-- Card Container -->
+  <div class="w-full max-w-2xl bg-white/20 backdrop-blur-xl rounded-2xl shadow-2xl p-8 sm:p-10 space-y-8 text-center transform transition hover:scale-[1.01]">
+
+    <!-- Header -->
+    <div>
+      <div class="flex items-center justify-center gap-3">
+        <!-- Creative Logo -->
+        <div class="bg-gradient-to-r from-sky-400 to-blue-600 p-3 rounded-full shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.104.896-2 2-2s2 .896 2 2v1h-4v-1zm-4 0V9a6 6 0 1112 0v2h1a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1h1z" />
+          </svg>
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-300 via-sky-200 to-white text-transparent bg-clip-text drop-shadow-lg">
+          Secure File Sharder
+        </h1>
+      </div>
+      <p class="mt-3 text-lg sm:text-xl font-medium text-sky-100 tracking-wide">
+        ✨ Split & Join your files securely in seconds ✨
+      </p>
+    </div>
+
+    <!-- Tab Buttons -->
+    <div class="flex justify-center border-b border-white/20">
+      <button id="tab-split" class="tab-btn active-tab">⚡ Split a File</button>
+      <button id="tab-join" class="tab-btn">🔗 Join Files</button>
+    </div>
+    
+    <!-- === Split Section === -->
+    <div id="split-section" class="fade-in">
+      <form id="split-form" class="space-y-8">
+        <div>
+          <label for="split-file-input" class="block text-lg font-semibold text-white mb-2">1️⃣ Choose a file</label>
+          <input type="file" id="split-file-input" name="file" required class="form-input"/>
+        </div>
+        <div>
+          <label for="pieces-input" class="block text-lg font-semibold text-white mb-2">2️⃣ Number of pieces</label>
+          <input type="number" id="pieces-input" name="pieces" value="5" min="2" required class="form-input-text"/>
+        </div>
+        <!-- Progress Bar -->
+        <div class="progress-bar-bg">
+          <div id="split-progress-bar" class="progress-bar"></div>
+        </div>
+        <!-- Submit Button -->
+        <button type="submit" id="split-btn" class="submit-btn bg-gradient-to-r from-blue-800 via-blue-600 to-sky-500">
+          <svg id="split-spinner" class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <span id="split-btn-text">Split File</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- === Join Section (hidden by default) === -->
+    <div id="join-section" class="hidden fade-in">
+      <form id="join-form" class="space-y-8">
+        <div>
+          <label for="join-files-input" class="block text-lg font-semibold text-white mb-2">1️⃣ Choose ALL files</label>
+          <p class="text-sm text-white/80 mb-2">(Select manifest.json, .key, and all .bin chunks)</p>
+          <input type="file" id="join-files-input" name="files" required multiple class="form-input"/>
+        </div>
+        <!-- Progress Bar -->
+        <div class="progress-bar-bg">
+          <div id="join-progress-bar" class="progress-bar"></div>
+        </div>
+        <!-- Submit Button -->
+        <button type="submit" id="join-btn" class="submit-btn bg-gradient-to-r from-blue-700 via-sky-600 to-cyan-400">
+          <svg id="join-spinner" class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <span id="join-btn-text">Join Files</span>
+        </button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 space-y-3 z-50"></div>
+
+  <!-- Styles -->
+  <style>
+    .tab-btn { padding: 0.75rem 1.5rem; font-weight: 600; font-size: 1.125rem; color: rgba(255, 255, 255, 0.7); border-bottom: 3px solid transparent; transition: all 0.3s ease; }
+    .tab-btn:hover { color: white; }
+    .active-tab { color: white; border-bottom-color: #38bdf8; font-weight: 700; }
+    .form-input { display: block; width: 100%; font-size: 1.125rem; color: white; }
+    .form-input::file-selector-button { margin-right: 1rem; padding: 0.75rem 1.5rem; border-radius: 9999px; border: 0; font-size: 1.125rem; font-weight: 600; background-color: rgba(255, 255, 255, 0.9); color: #1e3a8a; transition: background-color 0.2s; }
+    .form-input:hover::file-selector-button { background-color: white; }
+    .form-input-text { display: block; width: 100%; padding: 0.75rem 1rem; font-size: 1.125rem; border: 2px solid #93c5fd; border-radius: 0.5rem; background: rgba(255,255,255,0.2); color: white; }
+    .form-input-text:focus { outline: none; box-shadow: 0 0 0 3px #3b82f6; border-color: #2563eb; }
+    .submit-btn { width: 100%; padding: 1rem 1.5rem; font-size: 1.25rem; font-weight: 700; color: white; border-radius: 0.75rem; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .submit-btn:hover { transform: scale(1.03); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .progress-bar-bg { width: 100%; background-color: rgba(255, 255, 255, 0.3); border-radius: 9999px; height: 1rem; overflow: hidden; }
+    .progress-bar { height: 1rem; width: 0; background: linear-gradient(to right, #1d4ed8, #3b82f6, #38bdf8); transition: width 0.5s ease-in-out; }
+    .spinner { animation: spin 1s linear infinite; height: 1.5rem; width: 1.5rem; color: white; display: none; }
+    .fade-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px);} to { opacity: 1; transform: translateY(0);} }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    // Toast System
+    function showToast(message, type="info") {
+      const toast = document.createElement("div");
+      const colors = {
+        success: "bg-green-600",
+        error: "bg-red-600",
+        info: "bg-blue-600"
+      };
+      toast.className = `px-4 py-3 rounded-lg shadow-lg text-white font-semibold ${colors[type]} animate-bounce-in`;
+      toast.textContent = message;
+      document.getElementById("toast-container").appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    // Tabs
+    const tabSplit = document.getElementById("tab-split");
+    const tabJoin = document.getElementById("tab-join");
+    const splitSection = document.getElementById("split-section");
+    const joinSection = document.getElementById("join-section");
+
+    tabSplit.addEventListener("click", () => {
+      tabSplit.classList.add("active-tab");
+      tabJoin.classList.remove("active-tab");
+      splitSection.classList.remove("hidden");
+      joinSection.classList.add("hidden");
+    });
+
+    tabJoin.addEventListener("click", () => {
+      tabJoin.classList.add("active-tab");
+      tabSplit.classList.remove("active-tab");
+      joinSection.classList.remove("hidden");
+      splitSection.classList.add("hidden");
+    });
+
+    // Fetch logic
+    async function handleFormSubmit(event, { form, progressBar, btnText, spinner, submitBtn, endpoint, getFormData, getDownloadName, resetInput }) {
+      event.preventDefault();
+      const formData = getFormData();
+      if (!formData) return;
+
+      btnText.textContent = submitBtn.id.includes("split") ? "Splitting..." : "Joining...";
+      spinner.style.display = "block";
+      submitBtn.disabled = true;
+      progressBar.style.width = "20%";
+
+      try {
+        const response = await fetch(`http://127.0.0.1:8000${endpoint}`, { method: "POST", body: formData });
+        progressBar.style.width = "70%";
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = getDownloadName(response);
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+
+          progressBar.style.width = "100%";
+          showToast("✅ Success! Download started.", "success");
+
+          // Reset input after success
+          resetInput();
+        } else {
+          const err = await response.json();
+          showToast(`❌ Error: ${err.detail || "Something went wrong"}`, "error");
+          progressBar.style.width = "0%";
+        }
+      } catch (error) {
+        showToast("❌ Network error. Check server connection.", "error");
+        progressBar.style.width = "0%";
+      } finally {
+        btnText.textContent = submitBtn.id.includes("split") ? "Split File" : "Join Files";
+        spinner.style.display = "none";
+        submitBtn.disabled = false;
+        setTimeout(() => { progressBar.style.width = "0%"; }, 2000);
+      }
+    }
+
+    // Split Form
+    const splitForm = document.getElementById("split-form");
+    const splitBtn = document.getElementById("split-btn");
+    const splitBtnText = document.getElementById("split-btn-text");
+    const splitSpinner = document.getElementById("split-spinner");
+    const splitProgressBar = document.getElementById("split-progress-bar");
+    const splitFileInput = document.getElementById("split-file-input");
+
+    splitForm.addEventListener("submit", (e) => handleFormSubmit(e, {
+      form: splitForm,
+      progressBar: splitProgressBar,
+      btnText: splitBtnText,
+      spinner: splitSpinner,
+      submitBtn: splitBtn,
+      endpoint: "/split",
+      getFormData: () => {
+        if (!splitFileInput.files.length) {
+          showToast("❌ Please select a file first.", "error");
+          return null;
+        }
+        return new FormData(splitForm);
+      },
+      getDownloadName: () => `${splitFileInput.files[0].name}.zip`,
+      resetInput: () => { splitFileInput.value = ""; }
+    }));
+
+    // Join Form
+    const joinForm = document.getElementById("join-form");
+    const joinBtn = document.getElementById("join-btn");
+    const joinBtnText = document.getElementById("join-btn-text");
+    const joinSpinner = document.getElementById("join-spinner");
+    const joinProgressBar = document.getElementById("join-progress-bar");
+    const joinFilesInput = document.getElementById("join-files-input");
+
+    joinForm.addEventListener("submit", (e) => handleFormSubmit(e, {
+      form: joinForm,
+      progressBar: joinProgressBar,
+      btnText: joinBtnText,
+      spinner: joinSpinner,
+      submitBtn: joinBtn,
+      endpoint: "/join",
+      getFormData: () => {
+        if (joinFilesInput.files.length < 3) {
+          showToast("❌ Please select all required files (.key, .json, .bin).", "error");
+          return null;
+        }
+        const formData = new FormData();
+        for (const file of joinFilesInput.files) formData.append("files", file);
+        return formData;
+      },
+      getDownloadName: (response) => {
+        const disposition = response.headers.get("content-disposition");
+        const match = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition || "");
+        return match ? match[1].replace(/['"]/g, "") : "reconstructed_file";
+      },
+      resetInput: () => { joinFilesInput.value = ""; }
+    }));
+  </script>
+</body>
+</html>
