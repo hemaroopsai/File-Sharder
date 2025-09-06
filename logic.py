@@ -2,50 +2,38 @@ import os
 import json
 import hashlib
 from cryptography.fernet import Fernet
+from pathlib import Path
 
-def split_and_encrypt(original_filename: str, data: bytes, pieces: int) -> dict:
+def split_and_encrypt(original_filename: str, data: bytes, pieces: int, temp_dir: Path):
     """
-    Encrypts data, splits it into pieces, and returns a dictionary of file parts
-    including the manifest and encryption key.
-    
-    Args:
-        original_filename: The original name of the file being split.
-        data: The byte content of the file.
-        pieces: The number of chunks to split the encrypted data into.
+    Encrypts data and writes the output files (chunks, key, manifest)
+    to a temporary directory on disk instead of returning them in memory.
+    """
+    if len(data) < pieces:
+        raise ValueError("File size is smaller than the number of pieces requested.")
 
-    Returns:
-        A dictionary where keys are filenames and values are the byte content for each part.
-    """
-    # 1. Generate a unique encryption key and initialize Fernet
+    # 1. Generate key and encrypt data
     key = Fernet.generate_key()
     fernet = Fernet(key)
-
-    # 2. Encrypt the data
     encrypted_data = fernet.encrypt(data)
-
-    # 3. Calculate chunk sizes
-    file_size = len(encrypted_data)
-    if file_size < pieces:
-        raise ValueError("File size is smaller than the number of pieces requested.")
     
+    # 2. Prepare for chunking
+    file_size = len(encrypted_data)
     chunk_size = file_size // pieces
     remainder = file_size % pieces
 
-    # 4. Prepare the manifest and the dictionary for the final files
     manifest = {
         'original_filename': original_filename,
         'chunk_order': [],
         'chunk_hashes': []
     }
-    output_files = {}
     
-    # Add the encryption key to the output files
-    output_files['encryption_key.key'] = key
-    
-    # 5. Create chunks and populate the manifest
+    # NEW: Write the key file directly to the temporary directory
+    (temp_dir / 'encryption_key.key').write_bytes(key)
+
+    # 3. Create chunks and write them to disk
     current_pos = 0
     for i in range(pieces):
-        # The last piece gets the remainder
         current_chunk_size = chunk_size
         if i == pieces - 1:
             current_chunk_size += remainder
@@ -59,55 +47,51 @@ def split_and_encrypt(original_filename: str, data: bytes, pieces: int) -> dict:
         manifest['chunk_order'].append(chunk_filename)
         manifest['chunk_hashes'].append({'filename': chunk_filename, 'hash': chunk_hash})
         
-        output_files[chunk_filename] = chunk_data
+        # NEW: Write each chunk directly to a file
+        (temp_dir / chunk_filename).write_bytes(chunk_data)
 
-    # 6. Add the finalized manifest to the output files
+    # 4. Finalize and write the manifest file to disk
     manifest_bytes = json.dumps(manifest, indent=4).encode('utf-8')
-    output_files['manifest.json'] = manifest_bytes
+    (temp_dir / 'manifest.json').write_bytes(manifest_bytes)
 
-    return output_files
-
-
-def join_and_decrypt(file_data: dict) -> tuple[str, bytes]:
+def join_and_decrypt(file_data: dict[str, bytes]):
     """
-    Reassembles encrypted chunks, verifies their integrity, decrypts them,
-    and returns the original filename and data.
-
-    Args:
-        file_data: A dictionary where keys are filenames and values are the byte content
-                   of the manifest, key, and all chunks.
-
-    Returns:
-        A tuple containing the original filename (str) and the decrypted data (bytes).
+    Reassembles and decrypts a file from its manifest, key, and chunk data.
     """
-    # 1. Extract the key, manifest, and chunks from the provided files
-    key = file_data.get('encryption_key.key')
-    manifest_data = file_data.get('manifest.json')
+    # 1. Extract the necessary files from the provided dictionary
+    try:
+        manifest_data = json.loads(file_data['manifest.json'])
+        key = file_data['encryption_key.key']
+        
+        # Create a mapping of chunk filenames to their hashes for easy lookup
+        hash_map = {item['filename']: item['hash'] for item in manifest_data['chunk_hashes']}
+    except KeyError as e:
+        raise ValueError(f"Missing required file for joining: {e}")
 
-    if not key or not manifest_data:
-        raise ValueError("Missing encryption_key.key or manifest.json.")
-
-    manifest = json.loads(manifest_data)
-    original_filename = manifest['original_filename']
+    # 2. Initialize the decryption engine
+    fernet = Fernet(key)
     
-    # 2. Verify and reassemble the encrypted data
-    encrypted_data = b''
-    for i, chunk_filename in enumerate(manifest['chunk_order']):
+    # 3. Verify and reassemble chunks in the correct order
+    reassembled_encrypted_data = bytearray()
+    for chunk_filename in manifest_data['chunk_order']:
         chunk_data = file_data.get(chunk_filename)
         if not chunk_data:
             raise ValueError(f"Missing chunk file: {chunk_filename}")
-
-        # Verify integrity
-        expected_hash = manifest['chunk_hashes'][i]['hash']
-        actual_hash = hashlib.sha256(chunk_data).hexdigest()
-        if expected_hash != actual_hash:
-            raise ValueError(f"Hash mismatch for chunk {chunk_filename}. File may be corrupt.")
         
-        encrypted_data += chunk_data
+        # Verify the integrity of the chunk
+        expected_hash = hash_map.get(chunk_filename)
+        actual_hash = hashlib.sha256(chunk_data).hexdigest()
+        
+        if actual_hash != expected_hash:
+            raise ValueError(f"Chunk integrity check failed for {chunk_filename}. The file may be corrupted.")
+            
+        reassembled_encrypted_data.extend(chunk_data)
+        
+    # 4. Decrypt the reassembled data
+    decrypted_data = fernet.decrypt(reassembled_encrypted_data)
     
-    # 3. Decrypt the data
-    fernet = Fernet(key)
-    decrypted_data = fernet.decrypt(encrypted_data)
-
+    # 5. Return the original filename and the decrypted data
+    original_filename = manifest_data.get('original_filename', 'recovered_file')
+    
     return original_filename, decrypted_data
 
