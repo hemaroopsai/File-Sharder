@@ -73,9 +73,17 @@ async def http_split_file(pieces: int = Form(...), file: UploadFile = File(...))
 
 @app.post("/join")
 async def http_join_files(files: List[UploadFile] = File(...)):
+    # Create a secure temporary directory to work in
+    temp_dir = tempfile.mkdtemp()
     try:
-        file_data = {file.filename: await file.read() for file in files}
-        original_filename, decrypted_data = join_and_decrypt(file_data)
+        # Save all uploaded files to the temporary directory on disk
+        for file in files:
+            file_path = Path(temp_dir) / file.filename
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        
+        # The logic function now reads files from the temp dir
+        original_filename, decrypted_data = join_and_decrypt(Path(temp_dir))
         
         return StreamingResponse(
             io.BytesIO(decrypted_data),
@@ -85,4 +93,7 @@ async def http_join_files(files: List[UploadFile] = File(...)):
     except Exception as e:
         logger.error(f"Error during file joining: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # CRUCIAL: Clean up the temporary directory and all its contents
+        shutil.rmtree(temp_dir)
 
