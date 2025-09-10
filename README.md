@@ -56,8 +56,4 @@ This project is licensed under the MIT License.
 
 ---
 
-## 📝 3-Line Description
-**Secure File Sharder & Joiner** is a web-based app that securely encrypts and splits files into multiple parts, with the ability to rejoin them easily.
-It is containerized using **Docker** for simple setup and deployment.
-The tool ensures safe file handling and quick access through a lightweight web interface.
 
